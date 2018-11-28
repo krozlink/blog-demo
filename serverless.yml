@@ -1,0 +1,75 @@
+service: blog-demo
+
+plugins:
+  - serverless-s3-sync
+
+package:
+  excludeDevDependencies: true
+  exclude:
+    - web/**
+    - '!web/build/**'
+
+custom:
+  siteName: daniel-blog-demo.com
+  s3Sync:
+    - bucketName: ${self:custom.siteName}
+      localDir: web/build
+        
+provider:
+  name: aws
+  runtime: nodejs8.10
+  stage: dev
+  region: ap-southeast-2
+
+functions:
+  server:
+    handler: api/server.handler
+    events:
+      - http:
+          path: /
+          method: ANY
+          cors: true
+      - http:
+          path: /{proxy+}
+          method: ANY
+          cors: true
+
+
+resources:
+  Resources:
+    StaticSite:
+      Type: AWS::S3::Bucket
+      Properties:
+        AccessControl: PublicRead
+        BucketName: ${self:custom.siteName}
+        WebsiteConfiguration:
+          IndexDocument: index.html
+          ErrorDocument: index.html
+    
+    StaticSiteS3BucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket:
+          Ref: StaticSite
+        PolicyDocument:
+          Statement:
+            - Sid: PublicReadGetObject
+              Effect: Allow
+              Principal: "*"
+              Action:
+              - s3:GetObject
+              Resource:
+                Fn::Join: [
+                  "", [
+                    "arn:aws:s3:::",
+                    {
+                      "Ref": "StaticSite"
+                    },
+                    "/*"
+                  ]
+                ]
+
+  Outputs:
+    StaticSiteS3BucketName:
+      Value:
+        'Ref': StaticSite
